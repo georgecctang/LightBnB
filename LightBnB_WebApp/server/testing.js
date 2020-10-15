@@ -9,19 +9,62 @@ const pool = new Pool({
   database: 'lightbnb'
 })
 
-const getAllReservations = function(guest_id, limit = 10) {
-  return pool.query(`
-    SELECT p.id, p.title, p.cost_per_night, MAX(r.start_date) AS start_date, AVG(pr.rating) AS average_rating
-    FROM reservations AS r
-    JOIN properties AS p ON p.id = r.property_id
-    JOIN property_reviews AS pr ON p.id = pr.property_id
-    WHERE r.guest_id = $1 AND r.end_date <= now()::date
-    GROUP BY p.id
-    ORDER BY MAX(start_date)
-    LIMIT $2;
-  `, [guest_id, limit]).then(res => {
-    return {reservations: res.rows}})
+const getAllProperties = function(options, limit = 10) {
+  // 1
+  const queryParamValues = [];
+  // 2
+  let queryString = `
+  SELECT properties.*, avg(property_reviews.rating) as average_rating
+  FROM properties
+  JOIN property_reviews ON properties.id = property_id
+  `;
+
+  const queryParamComparisons = {
+    owner_id:'=', 
+    minimum_price_per_night: '>=', 
+    maximum_price_per_night: '<=',
+    minimum_rating: '>='
+  }
+  // 3
+  let keyword = 'WHERE';
+
+  if (options.city) {
+    queryParamValues.push(`%${options.city}%`);
+    queryString += `WHERE city LIKE $${queryParamValues.length} `;
+    keyword = 'AND';
+  }
+  for (const p in queryParamComparisons) {
+    if (options[p]) {
+      queryParamValues.push(options[p]);
+      queryString += `${keyword} ${p} ${queryParamComparisons[p]} $${queryParamValues.length} `;
+      keyword = 'AND';
+    }
+  }
+  // 4
+  queryParamValues.push(limit);
+  queryString += `
+  GROUP BY properties.id
+  ORDER BY cost_per_night
+  LIMIT $${queryParamValues.length};
+  `;
+
+  // 5
+  console.log(queryString, queryParamValues);
+
+  // 6
+  // return pool.query(queryString, queryParams)
+  // .then(res => res.rows);
 };
 
-getAllReservations(1).then(data => console.log(data));
+// {
+//   city,
+//   owner_id,
+//   minimum_price_per_night,
+//   maximum_price_per_night,
+//   minimum_rating
+// }
 
+getAllProperties({
+  minimum_price_per_night: 4000, 
+  maximum_price_per_night: 10000, 
+  minimum_rating: 3.5});
