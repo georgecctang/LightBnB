@@ -9,38 +9,19 @@ const pool = new Pool({
   database: 'lightbnb'
 })
 
-
-// const getUserWithEmail = function(email) {
-//   return pool.query(
-//     `SELECT *
-//     FROM users
-//     WHERE email = $1
-//     `, [email])
-//     .then(res => res.rows ? res.rows[0] : null); 
-// };
-
-// getUserWithEmail('asherpoole@gmx.com').then(data => console.log(data));
-
-// const getUserWithId = function(id) {
-//   return pool.query(
-//     `SELECT * 
-//     FROM users
-//     WHERE id = $1
-//     `, [id]
-//   ).then(res => res.rows ? res.rows[0] : null)
-// };
-
-// getUserWithId(10).then(data => console.log(data));
-
-
-const addUser = function(user) {
-  const { name, email, password } = user;
-  return pool.query(
-    `INSERT INTO users (name, email, password)
-    VALUES ($1, $2, $3)
-    RETURNING *
-    `, [name, email, password])
-    .then(res => res.rows[0]);
+const getAllReservations = function(guest_id, limit = 10) {
+  return pool.query(`
+    SELECT p.id, p.title, p.cost_per_night, MAX(r.start_date) AS start_date, AVG(pr.rating) AS average_rating
+    FROM reservations AS r
+    JOIN properties AS p ON p.id = r.property_id
+    JOIN property_reviews AS pr ON p.id = pr.property_id
+    WHERE r.guest_id = $1 AND r.end_date <= now()::date
+    GROUP BY p.id
+    ORDER BY MAX(start_date)
+    LIMIT $2;
+  `, [guest_id, limit]).then(res => {
+    return {reservations: res.rows}})
 };
 
-addUser({name: 'AAAAAA', email:'a@e.com', password: 'abc'}).then(data => console.log(data));
+getAllReservations(1).then(data => console.log(data));
+
